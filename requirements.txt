@@ -1,6 +1,9 @@
 streamlit
 pandas
 numpy
-plotly
 networkx
+plotly
 scikit-learn
+python-dateutil
+streamlit-aggrid
+streamlit-elements
