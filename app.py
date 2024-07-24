@@ -149,12 +149,12 @@ def create_enhanced_process_map(df):
                         titlefont_size=16,
                         showlegend=False,
                         hovermode='closest',
-                        margin=dict(b=20,l=5,r=5,t=40),
-                        annotations=[ dict(
+                        margin=dict(b=20, l=5, r=5, t=40),
+                        annotations=[dict(
                             text="Process Map",
                             showarrow=False,
                             xref="paper", yref="paper",
-                            x=0.005, y=-0.002 ) ],
+                            x=0.005, y=-0.002)],
                         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                     )
@@ -351,7 +351,7 @@ elif page == "Process Map":
                 fig = create_enhanced_process_map(filtered_df)
                 st.plotly_chart(fig, use_container_width=True)
             
-           with tab2:
+            with tab2:
                 activity_durations = perform_time_analysis(filtered_df)
                 bottlenecks = perform_bottleneck_analysis(filtered_df, activity_durations)
                 petri_net_graph = create_petri_net_map(filtered_df, bottlenecks.index)
