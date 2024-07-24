@@ -8,7 +8,6 @@ from datetime import datetime
 from dateutil import parser
 from sklearn.cluster import KMeans
 from st_aggrid import AgGrid, GridOptionsBuilder
-from streamlit_elements import elements, mui, html
 import io
 import base64
 import graphviz
@@ -130,12 +129,12 @@ def create_enhanced_process_map(df):
                         titlefont_size=16,
                         showlegend=False,
                         hovermode='closest',
-                        margin=dict(b=20, l=5, r=5, t=40),
-                        annotations=[dict(
+                        margin=dict(b=20,l=5,r=5,t=40),
+                        annotations=[ dict(
                             text="Process Map",
                             showarrow=False,
                             xref="paper", yref="paper",
-                            x=0.005, y=-0.002)],
+                            x=0.005, y=-0.002 ) ],
                         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                     )
@@ -282,15 +281,6 @@ elif page == "Statistics":
                     label=key,
                     value=f"{value:.2f}" if isinstance(value, float) else value
                 )
-        
-        # Activity frequency chart
-        st.subheader("Activity Frequency")
-        activity_freq = df['activity'].value_counts()
-        fig = px.bar(x=activity_freq.index, y=activity_freq.values)
-        fig.update_layout(xaxis_title="Activity", yaxis_title="Frequency")
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("Please upload and process data first")
         
         # Activity frequency chart
         st.subheader("Activity Frequency")
