@@ -293,14 +293,17 @@ elif page == "Statistics":
         stats = calculate_statistics(df)
         
         col1, col2, col3 = st.columns(3)
+        columns = [col1, col2, col3]
+        
         for i, (key, value) in enumerate(stats.items()):
-            with [col1, col2, col3][i % 3]:
-                st.markdown(f"""
-                <div class="stat-box">
-                    <h3>{key}</h3>
-                    <p>{value:.2f if isinstance(value, float) else value}</p>
-                </div>
-                """, unsafe_allow_html=True)
+            with columns[i % 3]:
+                st.markdown(
+                    "<div class='stat-box'>"
+                    f"<h3>{key}</h3>"
+                    f"<p>{value:.2f if isinstance(value, float) else value}</p>"
+                    "</div>",
+                    unsafe_allow_html=True
+                )
         
         # Activity frequency chart
         st.subheader("Activity Frequency")
