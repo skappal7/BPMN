@@ -16,25 +16,6 @@ import graphviz
 # Set page config
 st.set_page_config(page_title="Process Mining App", layout="wide")
 
-# Custom CSS
-st.markdown("""
-<style>
-.main {
-    padding-top: 2rem;
-}
-.stButton>button {
-    width: 100%;
-}
-.stat-box {
-    background-color: #ffffff;
-    border-radius: 5px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    margin: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 # Sidebar for navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Upload Data", "Statistics", "Process Map", "Time Analysis", "Bottleneck Analysis", "Variants", "Root Cause Analysis"])
@@ -297,13 +278,19 @@ elif page == "Statistics":
         
         for i, (key, value) in enumerate(stats.items()):
             with columns[i % 3]:
-                st.markdown(
-                    "<div class='stat-box'>"
-                    f"<h3>{key}</h3>"
-                    f"<p>{value:.2f if isinstance(value, float) else value}</p>"
-                    "</div>",
-                    unsafe_allow_html=True
+                st.metric(
+                    label=key,
+                    value=f"{value:.2f}" if isinstance(value, float) else value
                 )
+        
+        # Activity frequency chart
+        st.subheader("Activity Frequency")
+        activity_freq = df['activity'].value_counts()
+        fig = px.bar(x=activity_freq.index, y=activity_freq.values)
+        fig.update_layout(xaxis_title="Activity", yaxis_title="Frequency")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Please upload and process data first")
         
         # Activity frequency chart
         st.subheader("Activity Frequency")
