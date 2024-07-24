@@ -12,7 +12,6 @@ from streamlit_elements import elements, mui, html
 import io
 import base64
 import graphviz
-from io import BytesIO
 
 # Set page config
 st.set_page_config(page_title="Process Mining App", layout="wide")
@@ -26,12 +25,19 @@ st.markdown("""
 .stButton>button {
     width: 100%;
 }
+.stat-box {
+    background-color: #ffffff;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Upload Data", "Process Map", "Time Analysis", "Bottleneck Analysis", "Variants", "Statistics", "Root Cause Analysis"])
+page = st.sidebar.radio("Go to", ["Upload Data", "Statistics", "Process Map", "Time Analysis", "Bottleneck Analysis", "Variants", "Root Cause Analysis"])
 
 # Function to load data
 @st.cache_data
@@ -181,9 +187,7 @@ def create_petri_net_map(df, bottlenecks):
     for edge in G.edges():
         dot.edge(edge[0], edge[1])
 
-    # Render the graph
-    dot_data = dot.pipe(format='svg')
-    return dot_data
+    return dot
 
 # Function for time analysis
 def perform_time_analysis(df):
@@ -282,6 +286,31 @@ if page == "Upload Data":
                 
                 st.markdown(export_data(df), unsafe_allow_html=True)
 
+elif page == "Statistics":
+    st.title("Process Statistics")
+    if 'data' in st.session_state:
+        df = st.session_state['data']
+        stats = calculate_statistics(df)
+        
+        col1, col2, col3 = st.columns(3)
+        for i, (key, value) in enumerate(stats.items()):
+            with [col1, col2, col3][i % 3]:
+                st.markdown(f"""
+                <div class="stat-box">
+                    <h3>{key}</h3>
+                    <p>{value:.2f if isinstance(value, float) else value}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Activity frequency chart
+        st.subheader("Activity Frequency")
+        activity_freq = df['activity'].value_counts()
+        fig = px.bar(x=activity_freq.index, y=activity_freq.values)
+        fig.update_layout(xaxis_title="Activity", yaxis_title="Frequency")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Please upload and process data first")
+
 elif page == "Process Map":
     st.title("Process Maps")
     if 'data' in st.session_state:
@@ -300,8 +329,8 @@ elif page == "Process Map":
             bottlenecks = perform_bottleneck_analysis(df, activity_durations)
             
             # Create and display Petri net style map
-            petri_net_svg = create_petri_net_map(df, bottlenecks.index)
-            st.image(petri_net_svg)
+            petri_net_graph = create_petri_net_map(df, bottlenecks.index)
+            st.graphviz_chart(petri_net_graph)
         
         # Interactive filtering
         st.subheader("Filter Data")
@@ -322,11 +351,11 @@ elif page == "Process Map":
                 fig = create_enhanced_process_map(filtered_df)
                 st.plotly_chart(fig, use_container_width=True)
             
-            with tab2:
+           with tab2:
                 activity_durations = perform_time_analysis(filtered_df)
                 bottlenecks = perform_bottleneck_analysis(filtered_df, activity_durations)
-                petri_net_svg = create_petri_net_map(filtered_df, bottlenecks.index)
-                st.image(petri_net_svg)
+                petri_net_graph = create_petri_net_map(filtered_df, bottlenecks.index)
+                st.graphviz_chart(petri_net_graph)
     else:
         st.warning("Please upload and process data first")
 
@@ -398,35 +427,6 @@ elif page == "Variants":
         variant_cases = df.groupby('case_id').filter(lambda x: '->'.join(x['activity']) == selected_variant)
         st.write(f"Cases with this variant: {variant_cases['case_id'].nunique()}")
         st.write(variant_cases)
-    else:
-        st.warning("Please upload and process data first")
-
-elif page == "Statistics":
-    st.title("Process Statistics")
-    if 'data' in st.session_state:
-        df = st.session_state['data']
-        stats = calculate_statistics(df)
-        
-        with elements("stats_dashboard"):
-            mui.Box(
-                mui.Grid(
-                    mui.Grid(
-                        mui.Paper(
-                            mui.Typography(key, variant="h6"),
-                            mui.Typography(f"{value:.2f}" if isinstance(value, float) else value, variant="h4"),
-                            sx={"p": 2, "textAlign": "center"}
-                        ),
-                        xs=12, sm=6, md=4, key=key
-                    ) for key, value in stats.items()
-                ),
-                sx={"flexGrow": 1, "p": 2}
-            )
-        
-        # Activity frequency chart
-        activity_freq = df['activity'].value_counts()
-        fig = px.bar(x=activity_freq.index, y=activity_freq.values)
-        fig.update_layout(title="Activity Frequency", xaxis_title="Activity", yaxis_title="Frequency")
-        st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Please upload and process data first")
 
