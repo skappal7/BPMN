@@ -11,6 +11,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 from streamlit_elements import elements, mui, html
 import io
 import base64
+import graphviz
+from io import BytesIO
 
 # Set page config
 st.set_page_config(page_title="Process Mining App", layout="wide")
@@ -153,6 +155,36 @@ def create_enhanced_process_map(df):
     
     return fig
 
+# Function to create Petri net style process map
+def create_petri_net_map(df, bottlenecks):
+    # Create a directed graph
+    G = nx.DiGraph()
+
+    # Add nodes and edges
+    for case_id, case_df in df.groupby('case_id'):
+        activities = case_df['activity'].tolist()
+        for i in range(len(activities) - 1):
+            G.add_edge(activities[i], activities[i + 1])
+
+    # Create a graphviz graph
+    dot = graphviz.Digraph(comment='Petri Net Style Process Map')
+    dot.attr(rankdir='LR')  # Left to right layout
+
+    # Add nodes (activities)
+    for node in G.nodes():
+        if node in bottlenecks:
+            dot.node(node, node, shape='box', style='filled', fillcolor='red')
+        else:
+            dot.node(node, node, shape='box')
+
+    # Add edges (transitions)
+    for edge in G.edges():
+        dot.edge(edge[0], edge[1])
+
+    # Render the graph
+    dot_data = dot.pipe(format='svg')
+    return dot_data
+
 # Function for time analysis
 def perform_time_analysis(df):
     # Calculate activity durations
@@ -251,11 +283,25 @@ if page == "Upload Data":
                 st.markdown(export_data(df), unsafe_allow_html=True)
 
 elif page == "Process Map":
-    st.title("Enhanced Process Map")
+    st.title("Process Maps")
     if 'data' in st.session_state:
         df = st.session_state['data']
-        fig = create_enhanced_process_map(df)
-        st.plotly_chart(fig, use_container_width=True)
+        
+        # Create tabs for different visualizations
+        tab1, tab2 = st.tabs(["Network Chart", "Petri Net Style"])
+        
+        with tab1:
+            fig = create_enhanced_process_map(df)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            # Perform bottleneck analysis
+            activity_durations = perform_time_analysis(df)
+            bottlenecks = perform_bottleneck_analysis(df, activity_durations)
+            
+            # Create and display Petri net style map
+            petri_net_svg = create_petri_net_map(df, bottlenecks.index)
+            st.image(petri_net_svg)
         
         # Interactive filtering
         st.subheader("Filter Data")
@@ -269,9 +315,18 @@ elif page == "Process Map":
         
         st.write(f"Filtered data contains {filtered_df['case_id'].nunique()} cases and {len(filtered_df)} events.")
         
-        if st.button("Update Process Map"):
-            fig = create_enhanced_process_map(filtered_df)
-            st.plotly_chart(fig, use_container_width=True)
+        if st.button("Update Process Maps"):
+            tab1, tab2 = st.tabs(["Network Chart", "Petri Net Style"])
+            
+            with tab1:
+                fig = create_enhanced_process_map(filtered_df)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with tab2:
+                activity_durations = perform_time_analysis(filtered_df)
+                bottlenecks = perform_bottleneck_analysis(filtered_df, activity_durations)
+                petri_net_svg = create_petri_net_map(filtered_df, bottlenecks.index)
+                st.image(petri_net_svg)
     else:
         st.warning("Please upload and process data first")
 
