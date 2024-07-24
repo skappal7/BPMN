@@ -93,7 +93,10 @@ def create_enhanced_process_map(df):
     for edge in G.edges():
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
-        weight = edge_widths[(edge[0], edge[1])]
+        if (edge[0], edge[1]) in edge_widths:
+            weight = edge_widths[(edge[0], edge[1])]
+        else:
+            weight = 1  # Default width if edge is not in edge_widths
         edge_trace.append(
             go.Scatter(x=[x0, x1, None], y=[y0, y1, None],
                        line=dict(width=weight, color='#888'),
@@ -102,18 +105,30 @@ def create_enhanced_process_map(df):
         )
     
     # Create nodes
+    node_x = []
+    node_y = []
+    node_text = []
+    node_size = []
+    node_color = []
+    for node in G.nodes():
+        x, y = pos[node]
+        node_x.append(x)
+        node_y.append(y)
+        node_text.append(node)
+        node_size.append(node_sizes.get(node, 10))  # Default size if node is not in node_sizes
+        node_color.append(G.degree(node))
+
     node_trace = go.Scatter(
-        x=[pos[node][0] for node in G.nodes()],
-        y=[pos[node][1] for node in G.nodes()],
+        x=node_x, y=node_y,
         mode='markers+text',
         hoverinfo='text',
-        text=[node for node in G.nodes()],
+        text=node_text,
         textposition='top center',
         marker=dict(
             showscale=True,
             colorscale='YlOrRd',
-            size=[node_sizes[node] for node in G.nodes()],
-            color=[G.degree(node) for node in G.nodes()],
+            size=node_size,
+            color=node_color,
             line_width=2,
             colorbar=dict(thickness=15, title='Node Connections', xanchor='left', titleside='right')
         )
