@@ -29,7 +29,7 @@ st.markdown("""
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Upload Data", "Process Map", "Variants", "Statistics", "Root Cause Analysis"])
+page = st.sidebar.radio("Go to", ["Upload Data", "Process Map", "Time Analysis", "Bottleneck Analysis", "Variants", "Statistics", "Root Cause Analysis"])
 
 # Function to load data
 @st.cache_data
@@ -69,59 +69,60 @@ def preprocess_data(df, case_id_col, activity_col, timestamp_col):
     
     return df
 
-# Function to create process map
-def create_process_map(df):
-    edges = df.groupby('case_id')['activity'].apply(lambda x: list(zip(x, x[1:]))).explode()
-    edge_counts = edges.value_counts()
-
+# Function to create an enhanced process map
+def create_enhanced_process_map(df):
+    edges = df.groupby('case_id')['activity'].apply(lambda x: list(zip(x, x[1:])))
+    edge_counts = edges.explode().value_counts()
+    
     G = nx.DiGraph()
     for (source, target), weight in edge_counts.items():
         G.add_edge(source, target, weight=weight)
-
+    
+    # Calculate node sizes based on frequency
+    node_sizes = df['activity'].value_counts()
+    node_sizes = (node_sizes - node_sizes.min()) / (node_sizes.max() - node_sizes.min()) * 50 + 10
+    
+    # Calculate edge widths based on frequency
+    edge_widths = (edge_counts - edge_counts.min()) / (edge_counts.max() - edge_counts.min()) * 5 + 1
+    
+    # Calculate layout
     pos = nx.spring_layout(G)
-    edge_x, edge_y = [], []
+    
+    # Create edges
+    edge_trace = []
     for edge in G.edges():
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
-
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        line=dict(width=0.5, color='#888'),
-        hoverinfo='none',
-        mode='lines')
-
-    node_x, node_y = [], []
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-
+        weight = edge_widths[(edge[0], edge[1])]
+        edge_trace.append(
+            go.Scatter(x=[x0, x1, None], y=[y0, y1, None],
+                       line=dict(width=weight, color='#888'),
+                       hoverinfo='none',
+                       mode='lines')
+        )
+    
+    # Create nodes
     node_trace = go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers',
+        x=[pos[node][0] for node in G.nodes()],
+        y=[pos[node][1] for node in G.nodes()],
+        mode='markers+text',
         hoverinfo='text',
+        text=[node for node in G.nodes()],
+        textposition='top center',
         marker=dict(
             showscale=True,
-            colorscale='YlGnBu',
-            size=10,
+            colorscale='YlOrRd',
+            size=[node_sizes[node] for node in G.nodes()],
+            color=[G.degree(node) for node in G.nodes()],
+            line_width=2,
             colorbar=dict(thickness=15, title='Node Connections', xanchor='left', titleside='right')
         )
     )
-
-    node_adjacencies = []
-    node_text = []
-    for node, adjacencies in enumerate(G.adjacency()):
-        node_adjacencies.append(len(adjacencies[1]))
-        node_text.append(f'{adjacencies[0]}<br># of connections: {len(adjacencies[1])}')
-
-    node_trace.marker.color = node_adjacencies
-    node_trace.text = node_text
-
-    fig = go.Figure(data=[edge_trace, node_trace],
+    
+    # Create figure
+    fig = go.Figure(data=edge_trace + [node_trace],
                     layout=go.Layout(
-                        title='Process Map',
+                        title='Enhanced Process Map',
                         titlefont_size=16,
                         showlegend=False,
                         hovermode='closest',
@@ -136,6 +137,31 @@ def create_process_map(df):
                     )
     
     return fig
+
+# Function for time analysis
+def perform_time_analysis(df):
+    # Calculate activity durations
+    df['next_timestamp'] = df.groupby('case_id')['timestamp'].shift(-1)
+    df['duration'] = (df['next_timestamp'] - df['timestamp']).dt.total_seconds() / 3600  # in hours
+    
+    # Aggregate durations by activity
+    activity_durations = df.groupby('activity').agg({
+        'duration': ['mean', 'median', 'min', 'max', 'count']
+    })
+    activity_durations.columns = ['mean_duration', 'median_duration', 'min_duration', 'max_duration', 'frequency']
+    activity_durations = activity_durations.sort_values('mean_duration', ascending=False)
+    
+    return activity_durations
+
+# Function for bottleneck analysis
+def perform_bottleneck_analysis(df, activity_durations):
+    # Identify bottlenecks based on mean duration and frequency
+    bottlenecks = activity_durations[
+        (activity_durations['mean_duration'] > activity_durations['mean_duration'].mean()) &
+        (activity_durations['frequency'] > activity_durations['frequency'].mean())
+    ]
+    
+    return bottlenecks
 
 # Function to analyze variants
 def analyze_variants(df):
@@ -210,10 +236,10 @@ if page == "Upload Data":
                 st.markdown(export_data(df), unsafe_allow_html=True)
 
 elif page == "Process Map":
-    st.title("Process Map")
+    st.title("Enhanced Process Map")
     if 'data' in st.session_state:
         df = st.session_state['data']
-        fig = create_process_map(df)
+        fig = create_enhanced_process_map(df)
         st.plotly_chart(fig, use_container_width=True)
         
         # Interactive filtering
@@ -227,6 +253,60 @@ elif page == "Process Map":
             filtered_df = filtered_df[filtered_df['activity'].isin(activities)]
         
         st.write(f"Filtered data contains {filtered_df['case_id'].nunique()} cases and {len(filtered_df)} events.")
+        
+        if st.button("Update Process Map"):
+            fig = create_enhanced_process_map(filtered_df)
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Please upload and process data first")
+
+elif page == "Time Analysis":
+    st.title("Time Analysis")
+    if 'data' in st.session_state:
+        df = st.session_state['data']
+        activity_durations = perform_time_analysis(df)
+        
+        st.subheader("Activity Durations")
+        st.write(activity_durations)
+        
+        # Visualize mean durations
+        fig = px.bar(activity_durations, x=activity_durations.index, y='mean_duration',
+                     labels={'mean_duration': 'Mean Duration (hours)', 'index': 'Activity'},
+                     title="Mean Duration by Activity")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Visualize frequency
+        fig = px.bar(activity_durations, x=activity_durations.index, y='frequency',
+                     labels={'frequency': 'Frequency', 'index': 'Activity'},
+                     title="Activity Frequency")
+        st.plotly_chart(fig, use_container_width=True)
+        
+    else:
+        st.warning("Please upload and process data first")
+
+elif page == "Bottleneck Analysis":
+    st.title("Bottleneck Analysis")
+    if 'data' in st.session_state:
+        df = st.session_state['data']
+        activity_durations = perform_time_analysis(df)
+        bottlenecks = perform_bottleneck_analysis(df, activity_durations)
+        
+        st.subheader("Identified Bottlenecks")
+        st.write(bottlenecks)
+        
+        # Visualize bottlenecks
+        fig = px.scatter(activity_durations, x='frequency', y='mean_duration',
+                         text=activity_durations.index,
+                         labels={'mean_duration': 'Mean Duration (hours)', 'frequency': 'Frequency'},
+                         title="Bottleneck Analysis")
+        fig.add_shape(type="rect",
+                      x0=activity_durations['frequency'].mean(), y0=activity_durations['mean_duration'].mean(),
+                      x1=activity_durations['frequency'].max(), y1=activity_durations['mean_duration'].max(),
+                      line=dict(color="Red", width=2, dash="dash"))
+        fig.add_annotation(x=activity_durations['frequency'].max(), y=activity_durations['mean_duration'].max(),
+                           text="Bottleneck Zone", showarrow=False, yshift=10)
+        st.plotly_chart(fig, use_container_width=True)
+        
     else:
         st.warning("Please upload and process data first")
 
