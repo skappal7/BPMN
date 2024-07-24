@@ -57,16 +57,11 @@ def load_data(file):
     return df
 
 # Function to preprocess data
-def preprocess_data(df):
-    required_columns = ['case:concept:name', 'concept:name', 'time:timestamp']
-    if not all(col in df.columns for col in required_columns):
-        st.error("Required columns missing. Please ensure your data has case ID, activity, and timestamp columns.")
-        return None
-    
+def preprocess_data(df, case_id_col, activity_col, timestamp_col):
     df = df.rename(columns={
-        'case:concept:name': 'case_id',
-        'concept:name': 'activity',
-        'time:timestamp': 'timestamp'
+        case_id_col: 'case_id',
+        activity_col: 'activity',
+        timestamp_col: 'timestamp'
     })
     
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -163,7 +158,6 @@ def calculate_statistics(df):
 
 # Function for root cause analysis
 def root_cause_analysis(df, target_activity):
-    # Prepare data for clustering
     cases = df.groupby('case_id').agg({
         'activity': lambda x: '->'.join(x),
         'timestamp': ['min', 'max']
@@ -172,7 +166,6 @@ def root_cause_analysis(df, target_activity):
     cases['duration'] = (cases['end_time'] - cases['start_time']).dt.total_seconds() / 86400
     cases['target'] = cases['sequence'].str.contains(target_activity).astype(int)
 
-    # Perform k-means clustering
     kmeans = KMeans(n_clusters=3, random_state=42)
     cases['cluster'] = kmeans.fit_predict(cases[['duration', 'target']])
 
@@ -192,10 +185,19 @@ if page == "Upload Data":
     if uploaded_file is not None:
         df = load_data(uploaded_file)
         if df is not None:
-            df = preprocess_data(df)
-            if df is not None:
+            st.success("Data loaded successfully!")
+            st.write(df.head())
+            
+            # Column selection
+            st.subheader("Select Columns")
+            case_id_col = st.selectbox("Select Case ID column", df.columns)
+            activity_col = st.selectbox("Select Activity column", df.columns)
+            timestamp_col = st.selectbox("Select Timestamp column", df.columns)
+            
+            if st.button("Process Data"):
+                df = preprocess_data(df, case_id_col, activity_col, timestamp_col)
                 st.session_state['data'] = df
-                st.success("Data loaded successfully!")
+                st.success("Data processed successfully!")
                 
                 gb = GridOptionsBuilder.from_dataframe(df)
                 gb.configure_pagination()
@@ -226,7 +228,7 @@ elif page == "Process Map":
         
         st.write(f"Filtered data contains {filtered_df['case_id'].nunique()} cases and {len(filtered_df)} events.")
     else:
-        st.warning("Please upload data first")
+        st.warning("Please upload and process data first")
 
 elif page == "Variants":
     st.title("Variant Analysis")
@@ -247,7 +249,7 @@ elif page == "Variants":
         st.write(f"Cases with this variant: {variant_cases['case_id'].nunique()}")
         st.write(variant_cases)
     else:
-        st.warning("Please upload data first")
+        st.warning("Please upload and process data first")
 
 elif page == "Statistics":
     st.title("Process Statistics")
@@ -255,7 +257,6 @@ elif page == "Statistics":
         df = st.session_state['data']
         stats = calculate_statistics(df)
         
-        # Use Streamlit Elements to create a more professional-looking UI
         with elements("stats_dashboard"):
             mui.Box(
                 mui.Grid(
@@ -277,7 +278,7 @@ elif page == "Statistics":
         fig.update_layout(title="Activity Frequency", xaxis_title="Activity", yaxis_title="Frequency")
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Please upload data first")
+        st.warning("Please upload and process data first")
 
 elif page == "Root Cause Analysis":
     st.title("Root Cause Analysis")
@@ -301,4 +302,4 @@ elif page == "Root Cause Analysis":
                 st.write(cluster_data['sequence'].value_counts().head())
                 st.write("---")
     else:
-        st.warning("Please upload data first")
+        st.warning("Please upload and process data first")
