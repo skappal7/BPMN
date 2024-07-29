@@ -15,6 +15,65 @@ import graphviz
 # Set page config
 st.set_page_config(page_title="Process Mining App", layout="wide")
 
+# Function to display explainer
+def display_explainer(title, content):
+    with st.expander(f"ℹ️ {title} Explainer"):
+        st.markdown(content)
+
+# Explainer content
+explainers = {
+    "Upload Data": """
+    This section allows you to upload your event log data in CSV or XES format. 
+    - Select the appropriate columns for Case ID, Activity, and Timestamp.
+    - After processing, you can view and download the processed data.
+    - The data will be used for all subsequent analyses in the app.
+    """,
+    
+    "Statistics": """
+    The Statistics page provides an overview of your process data:
+    - Key metrics such as total cases, events, and unique activities.
+    - Case duration statistics.
+    - A bar chart showing the frequency of each activity in the process.
+    This helps you understand the overall structure and scale of your process.
+    """,
+    
+    "Process Map": """
+    Process Maps visualize the flow of activities in your process:
+    - Network Chart: Shows activities as nodes and transitions as edges. Node size represents activity frequency, and edge width represents transition frequency.
+    - Petri Net Style: A more formal representation of the process, with bottlenecks highlighted in red.
+    - You can filter the data to focus on specific date ranges or activities.
+    """,
+    
+    "Time Analysis": """
+    Time Analysis helps you understand the duration of activities:
+    - View statistics on activity durations, including mean, median, min, and max.
+    - Bar charts visualize mean durations and frequencies of activities.
+    This information is crucial for identifying time-consuming steps in your process.
+    """,
+    
+    "Bottleneck Analysis": """
+    Bottleneck Analysis identifies activities that may be slowing down your process:
+    - Activities with high frequency and long duration are considered bottlenecks.
+    - The scatter plot helps visualize potential bottlenecks.
+    - Bottlenecks are also highlighted in the Petri Net Style process map.
+    """,
+    
+    "Variants": """
+    Variant Analysis shows different paths through your process:
+    - View the most common process variants and their frequencies.
+    - Analyze details of specific variants, including which cases follow each variant.
+    This helps understand process diversity and identify standard and non-standard paths.
+    """,
+    
+    "Root Cause Analysis": """
+    Root Cause Analysis helps identify factors that lead to specific outcomes:
+    - Select a target activity to analyze.
+    - Cases are clustered based on duration and presence of the target activity.
+    - The scatter plot and cluster analysis help identify patterns that may lead to the target activity.
+    This can be useful for understanding what influences certain outcomes in your process.
+    """
+}
+
 # Sidebar for navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Upload Data", "Statistics", "Process Map", "Time Analysis", "Bottleneck Analysis", "Variants", "Root Cause Analysis"])
@@ -238,6 +297,7 @@ def export_data(df):
 # Main content
 if page == "Upload Data":
     st.title("Upload Event Log")
+    display_explainer("Upload Data", explainers["Upload Data"])
     uploaded_file = st.file_uploader("Choose a CSV or XES file", type=["csv", "xes"])
     if uploaded_file is not None:
         df = load_data(uploaded_file)
@@ -268,6 +328,7 @@ if page == "Upload Data":
 
 elif page == "Statistics":
     st.title("Process Statistics")
+    display_explainer("Statistics", explainers["Statistics"])
     if 'data' in st.session_state:
         df = st.session_state['data']
         stats = calculate_statistics(df)
@@ -293,6 +354,7 @@ elif page == "Statistics":
 
 elif page == "Process Map":
     st.title("Process Maps")
+    display_explainer("Process Map", explainers["Process Map"])
     if 'data' in st.session_state:
         df = st.session_state['data']
         
@@ -341,6 +403,7 @@ elif page == "Process Map":
 
 elif page == "Time Analysis":
     st.title("Time Analysis")
+    display_explainer("Time Analysis", explainers["Time Analysis"])
     if 'data' in st.session_state:
         df = st.session_state['data']
         activity_durations = perform_time_analysis(df)
@@ -365,6 +428,7 @@ elif page == "Time Analysis":
 
 elif page == "Bottleneck Analysis":
     st.title("Bottleneck Analysis")
+    display_explainer("Bottleneck Analysis", explainers["Bottleneck Analysis"])
     if 'data' in st.session_state:
         df = st.session_state['data']
         activity_durations = perform_time_analysis(df)
@@ -391,6 +455,7 @@ elif page == "Bottleneck Analysis":
 
 elif page == "Variants":
     st.title("Variant Analysis")
+    display_explainer("Variants", explainers["Variants"])
     if 'data' in st.session_state:
         df = st.session_state['data']
         variants = analyze_variants(df)
@@ -412,6 +477,7 @@ elif page == "Variants":
 
 elif page == "Root Cause Analysis":
     st.title("Root Cause Analysis")
+    display_explainer("Root Cause Analysis", explainers["Root Cause Analysis"])
     if 'data' in st.session_state:
         df = st.session_state['data']
         target_activity = st.selectbox("Select target activity", df['activity'].unique())
